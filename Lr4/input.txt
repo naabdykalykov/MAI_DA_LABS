@@ -1,0 +1,3 @@
+cat dog cat dog bird
+CAT dog CaT Dog Cat DOG bird CAT
+dog cat dog bird
