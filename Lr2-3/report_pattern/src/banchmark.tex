@@ -1,0 +1,90 @@
+\section{Тест производительности}
+
+Для оценки эффективности реализованного PATRICIA-дерева было проведено сравнение его производительности со стандартной реализацией словаря \texttt{std::map} из STL, который обычно основан на сбалансированном красно-черном дереве. Асимптотическая сложность поиска в PATRICIA-дереве составляет $O(K)$, где $K$ — длина ключа. Время операции не зависит от количества элементов в словаре. Сложность поиска в \texttt{std::map} составляет $O(K \cdot \log N)$, где $N$ — количество элементов, так как на каждом из $\log N$ уровней дерева происходит сравнение строк длиной $K$.
+
+Тестирование проводилось на большом наборе данных: в обе структуры (PATRICIA и \texttt{std::map}) было добавлено 1,000,000 ($10^6$) уникальных слов, после чего выполнялся 1,000,000 операций поиска. Для замера времени использовалась библиотека \texttt{<chrono>}. Компиляция обоих вариантов производилась с флагом оптимизации \texttt{-O2}.
+\begin{alltt}
+\fontfamily{pcr}\selectfont
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ g++ -O2 -std=c++17 patricia_perf.cpp -o patricia_tester
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ ./patricia_tester
+PATRICIA tree: 1,000,000 insertions and 1,000,000 lookups took: 1.2158 seconds
+
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ g++ -O2 -std=c++17 map_perf.cpp -o map_tester
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ ./map_tester
+std::map: 1,000,000 insertions and 1,000,000 lookups took: 2.5831 seconds
+\end{alltt}
+
+Как показывают результаты, реализация на PATRICIA-дереве выполняет поиск примерно в 2 раза быстрее, чем высокооптимизированная структура \texttt{std::map}. Это объясняется фундаментальным различием в их алгоритмах. Время поиска в PATRICIA не зависит от общего числа элементов в словаре ($N$), а определяется только длиной ключа ($K$), так как навигация по дереву происходит напрямую на основе битов ключа. В то же время, производительность \texttt{std::map} деградирует с ростом числа элементов из-за логарифмического фактора $\log N$, связанного с глубиной дерева. Это демонстрирует преимущество PATRICIA-дерева для задач, требующих максимально быстрых строковых поисков в очень больших словарях.
+
+\pagebreak
+
+\section{Valgrind}
+Для проверки программы на наличие утечек памяти и других ошибок при работе с ней была использована утилита \texttt{Valgrind} с инструментом \texttt{Memcheck}. Сначала была выполнена компиляция программы с флагами \texttt{-g} (для добавления отладочной информации) и \texttt{-O0} (для отключения оптимизации компилятора). Тестирование проводилось на наборе команд, который задействует все основные операции с динамической памятью: создание, сложное ветвление и удаление узлов дерева. Запуск \texttt{Valgrind} производился с флагом \texttt{--leak-check=full} для максимально детального анализа.
+
+\begin{alltt}
+\fontfamily{pcr}\selectfont
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ g++ -std=c++17 -g -O0 -o patricia_dict patricia_dict.cpp
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ valgrind --leak-check=full ./patricia_dict < input.txt
+==2693== Memcheck, a memory error detector
+==2693== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==2693== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+==2693== Command: ./patricia_dict
+==2693==
+OK
+OK
+OK
+OK: 10
+OK
+NoSuchWord
+OK
+OK: 10
+OK
+==2693==
+==2693== HEAP SUMMARY:
+==2693==     in use at exit: 122,880 bytes in 6 blocks
+==2693==   total heap usage: 12 allocs, 6 frees, 197,088 bytes allocated
+==2693==
+==2693== LEAK SUMMARY:
+==2693==    definitely lost: 0 bytes in 0 blocks
+==2693==    indirectly lost: 0 bytes in 0 blocks
+==2693==      possibly lost: 0 bytes in 0 blocks
+==2693==    still reachable: 122,880 bytes in 6 blocks
+==2693==         suppressed: 0 bytes in 0 blocks
+==2693==
+==2693== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+\end{alltt}
+
+\textbf{Анализ результатов:} Как видно из вывода \texttt{Valgrind}, в программе-словаре отсутствуют утечки памяти, что подтверждается строкой \texttt{definitely lost: 0 bytes in 0 blocks}. Некоторое количество памяти помечено как \texttt{still reachable}, что является нормальным поведением для программ, использующих стандартную библиотеку C++, и не считается ошибкой в коде. Отчет \texttt{ERROR SUMMARY: 0 errors} также подтверждает отсутствие других ошибок при работе с памятью. Это свидетельствует о корректной реализации управления ресурсами с помощью умных указателей \texttt{std::shared\_ptr}.
+\pagebreak
+
+\section{gprof}
+Для проверки эффективности программы и определения функций, на которые приходится основная вычислительная нагрузка, используется профилировщик \texttt{gprof}. Сначала программа компилируется с флагами \texttt{-pg} для записи данных профилирования и \texttt{-O2} для включения оптимизации, чтобы анализ отражал производительность реального приложения. Проверка выполняется на тестовом наборе команд, после чего создается файл \texttt{gmon.out}. Затем выполняется анализ данных профилирования с помощью \texttt{gprof} и бинарного файла программы-словаря, и на их основе создается отчет.
+
+\begin{alltt}
+\fontfamily{pcr}\selectfont
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ g++ -std=c++17 -O2 -pg -o patricia_gprof patricia_dict.cpp
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ ./patricia_gprof < input.txt > /dev/null
+laysou@DESKTOP-QPGEK53:/mnt/c/Users/abdyk/Desktop/Lr2$ gprof ./patricia_gprof gmon.out | head -n 15
+
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+ no time accumulated
+
+  %   cumulative   self              self     total
+ time   seconds   seconds    calls  Ts/call  Ts/call  name
+  0.00      0.00     0.00        6     0.00     0.00  frame_dummy
+  0.00      0.00     0.00        5     0.00     0.00  std::_Sp_counted_ptr_inplace<Patricia::Node, ...>::_M_destroy()
+  0.00      0.00     0.00        5     0.00     0.00  std::_Sp_counted_ptr_inplace<Patricia::Node, ...>::_M_dispose()
+  0.00      0.00     0.00        3     0.00     0.00  handle_add(Patricia&, ...)
+  0.00      0.00     0.00        3     0.00     0.00  handle_remove(Patricia&, ...)
+  0.00      0.00     0.00        3     0.00     0.00  handle_search(Patricia&, ...)
+  0.00      0.00     0.00        3     0.00     0.00  Patricia::insert(...)
+  0.00      0.00     0.00        3     0.00     0.00  Patricia::remove(...)
+\end{alltt}
+\pagebreak
+
+\textbf{Анализ результатов:} Из раздела "плоский профиль" отчета можно сделать вывод о структуре вызовов в программе. Поскольку выполнение на малом тестовом наборе данных происходит практически мгновенно, профилировщик сообщает \texttt{no time accumulated}. Однако отчет все еще информативен благодаря столбцу \texttt{calls}, который показывает количество вызовов каждой функции.
+
+Видно, что высокоуровневые функции-обработчики (\texttt{handle\_add}, \texttt{handle\_remove} и т.д.) и соответствующие им ключевые методы класса (\texttt{Patricia::insert}, \texttt{Patricia::remove}) были вызваны по 3 раза, что точно соответствует командам в тестовом файле. Основная работа программы, таким образом, сосредоточена внутри этих ключевых методов, а не во вспомогательных операциях, что говорит о правильной архитектуре приложения. Также в отчете присутствуют вызовы внутренних функций стандартной библиотеки (например, \texttt{\_M\_destroy} и \texttt{\_M\_dispose} для умных указателей \texttt{shared\_ptr}), что подтверждает корректное управление памятью.
+\pagebreak

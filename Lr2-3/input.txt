@@ -1,0 +1,9 @@
++ apple 10
++ banana 20
++ applause 30
+apple
+- applause
+applause
+- banana
+apple
+- apple
